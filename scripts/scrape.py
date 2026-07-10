@@ -215,6 +215,50 @@ def add_base_tag(soup, base_url):
             soup.head.insert(0, base)
 
 
+def cleanup_scripts(soup):
+    blocked_domains = [
+        "hotjar", "google-analytics", "googletagmanager",
+        "facebook.net", "googleadservices", "doubleclick",
+        "gtag", "analytics", "tracking",
+    ]
+    for script in soup.find_all("script"):
+        src = script.get("src", "")
+        text = script.get_text() or ""
+        if any(d in src.lower() for d in blocked_domains):
+            script.decompose()
+            continue
+        if any(d in text.lower() for d in blocked_domains):
+            script.decompose()
+            continue
+        if src and not src.startswith("data:") and not src.startswith("//"):
+            parsed = urllib.parse.urlparse(src)
+            if parsed.path and not parsed.hostname:
+                original_path = src.lstrip("/")
+                if not Path(SITE_DIR / "assets" / original_path).exists():
+                    if (ASSETS_DIR / original_path).exists():
+                        script["src"] = f"assets/{original_path}"
+                    else:
+                        print(f"  [x] Script introuvable, retiré : {src[:60]}")
+                        script.decompose()
+
+    for iframe in soup.find_all("iframe"):
+        src = iframe.get("src", "")
+        if any(d in src.lower() for d in blocked_domains):
+            iframe.decompose()
+
+    for link in soup.find_all("link"):
+        href = link.get("href", "")
+        if any(d in href.lower() for d in blocked_domains):
+            link.decompose()
+
+    for img in soup.find_all("img"):
+        src = img.get("src", "")
+        if any(d in src.lower() for d in blocked_domains):
+            img.decompose()
+
+    print("  [✓] Scripts et traqueurs nettoyés")
+
+
 def save_html(soup, output_path):
     html_bytes = soup.encode("utf-8")
     output_path.write_bytes(html_bytes)
@@ -238,6 +282,9 @@ def main():
 
         print("[*] Téléchargement des assets...")
         download_assets(soup, base_url, ASSETS_DIR)
+
+        print("[*] Nettoyage des scripts externes problématiques...")
+        cleanup_scripts(soup)
 
         print("[*] Injection des balises SEO...")
         inject_seo(soup)
