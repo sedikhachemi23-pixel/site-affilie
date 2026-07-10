@@ -216,7 +216,7 @@ def add_base_tag(soup, base_url):
 
 def cleanup_scripts(soup):
     blocked_domains = [
-        "hotjar", "google-analytics", "googletagmanager",
+        "google-analytics", "googletagmanager",
         "facebook.net", "googleadservices", "doubleclick",
         "gtag", "analytics", "tracking",
     ]
@@ -281,12 +281,6 @@ def main():
 
         print("[*] Nettoyage des scripts externes problématiques...")
         cleanup_scripts(soup)
-
-        print("[*] Injection des stubs JS (traqueurs supprimés)...")
-        stub = soup.new_tag("script")
-        stub.string = "window.hj=function(){};window._hjSettings={hjid:0,hjsv:0};window.onloadcallback=function(){};"
-        if soup.head:
-            soup.head.append(stub)
 
         print("[*] Injection des balises SEO...")
         inject_seo(soup)
