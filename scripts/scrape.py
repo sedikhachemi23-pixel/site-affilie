@@ -214,21 +214,49 @@ def add_base_tag(soup, base_url):
             soup.head.insert(0, base)
 
 
-def cleanup_scripts(soup):
-    blocked_domains = [
-        "google-analytics", "googletagmanager",
-        "facebook.net", "googleadservices", "doubleclick",
-        "gtag", "analytics", "tracking", "hotjar",
-    ]
+BLOCKED_DOMAINS = [
+    "google-analytics", "googletagmanager",
+    "facebook.net", "googleadservices", "doubleclick",
+    "gtag", "analytics", "tracking", "hotjar",
+]
+
+
+def remove_blocked_elements(soup):
+    """Supprime les traqueurs AVANT le téléchargement des assets,
+    tant que les src pointent encore vers leurs domaines d'origine."""
+    for script in soup.find_all("script"):
+        src = (script.get("src") or "").lower()
+        text = (script.get_text() or "").lower()
+        if any(d in src for d in BLOCKED_DOMAINS):
+            print(f"  [x] Script traqueur retiré : {src[:70]}")
+            script.decompose()
+            continue
+        if any(d in text for d in BLOCKED_DOMAINS):
+            script.decompose()
+
+    for iframe in soup.find_all("iframe"):
+        src = (iframe.get("src") or "").lower()
+        if any(d in src for d in BLOCKED_DOMAINS):
+            iframe.decompose()
+
+    for link in soup.find_all("link"):
+        href = (link.get("href") or "").lower()
+        if any(d in href for d in BLOCKED_DOMAINS):
+            link.decompose()
+
+    for img in soup.find_all("img"):
+        src = (img.get("src") or "").lower()
+        if any(d in src for d in BLOCKED_DOMAINS):
+            img.decompose()
+
+    print("  [✓] Traqueurs supprimés (avant téléchargement)")
+
+
+def remove_missing_local_scripts(soup):
+    """Supprime les balises script pointant vers des fichiers locaux
+    qui n'ont pas pu être téléchargés."""
     for script in soup.find_all("script"):
         src = script.get("src", "")
-        text = script.get_text() or ""
-        if any(d in src.lower() for d in blocked_domains):
-            script.decompose()
-            continue
-        if any(d in text.lower() for d in blocked_domains):
-            script.decompose()
-            continue
         if src and not src.startswith("data:") and not src.startswith("//"):
             parsed = urllib.parse.urlparse(src)
             if parsed.path and not parsed.hostname:
@@ -236,23 +264,6 @@ def cleanup_scripts(soup):
                 if not (SITE_DIR / original_path).exists():
                     print(f"  [x] Script introuvable, retiré : {src[:60]}")
                     script.decompose()
-
-    for iframe in soup.find_all("iframe"):
-        src = iframe.get("src", "")
-        if any(d in src.lower() for d in blocked_domains):
-            iframe.decompose()
-
-    for link in soup.find_all("link"):
-        href = link.get("href", "")
-        if any(d in href.lower() for d in blocked_domains):
-            link.decompose()
-
-    for img in soup.find_all("img"):
-        src = img.get("src", "")
-        if any(d in src.lower() for d in blocked_domains):
-            img.decompose()
-
-    print("  [✓] Scripts et traqueurs nettoyés")
 
 
 def save_html(soup, output_path):
@@ -276,11 +287,14 @@ def main():
 
         soup = BeautifulSoup(html, "lxml")
 
+        print("[*] Suppression des traqueurs (avant téléchargement)...")
+        remove_blocked_elements(soup)
+
         print("[*] Téléchargement des assets...")
         download_assets(soup, base_url, SITE_DIR)
 
-        print("[*] Nettoyage des scripts externes problématiques...")
-        cleanup_scripts(soup)
+        print("[*] Nettoyage des scripts introuvables...")
+        remove_missing_local_scripts(soup)
 
         print("[*] Injection des stubs JS (traqueurs supprimés)...")
         stub = soup.new_tag("script")
