@@ -282,6 +282,12 @@ def main():
         print("[*] Nettoyage des scripts externes problématiques...")
         cleanup_scripts(soup)
 
+        print("[*] Injection des stubs JS (traqueurs supprimés)...")
+        stub = soup.new_tag("script")
+        stub.string = "window.hj=function(){};window._hjSettings={hjid:0,hjsv:0};window.onloadcallback=function(){};"
+        if soup.head:
+            soup.head.append(stub)
+
         print("[*] Injection des balises SEO...")
         inject_seo(soup)
 
