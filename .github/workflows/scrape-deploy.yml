@@ -21,8 +21,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r scripts/requirements.txt
-          sudo apt-get update
-          sudo apt-get install -y google-chrome-stable
+          google-chrome --version || sudo apt-get update && sudo apt-get install -y google-chrome-stable
 
       - name: Run scraper
         env:
