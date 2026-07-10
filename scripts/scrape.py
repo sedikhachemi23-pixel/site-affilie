@@ -14,7 +14,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 
 SITE_DIR = Path(__file__).resolve().parent.parent / "site"
-ASSETS_DIR = SITE_DIR / "assets"
 
 AFFILIATE_URL = os.environ.get(
     "AFFILIATE_URL",
@@ -85,7 +84,7 @@ def download_asset(url, folder):
     local_path.parent.mkdir(parents=True, exist_ok=True)
 
     if local_path.exists():
-        return f"assets/{path}"
+        return path
 
     try:
         headers = {
@@ -95,7 +94,7 @@ def download_asset(url, folder):
         if resp.status_code == 200:
             local_path.write_bytes(resp.content)
             print(f"  [↓] {path}")
-            return f"assets/{path}"
+            return path
         else:
             print(f"  [!] Échec {url} -> status {resp.status_code}")
             return url
@@ -104,7 +103,7 @@ def download_asset(url, folder):
         return url
 
 
-def download_assets(soup, base_url, assets_dir):
+def download_assets(soup, base_url, site_dir):
     tags_attrs = {
         "img": "src",
         "link": "href",
@@ -117,7 +116,7 @@ def download_assets(soup, base_url, assets_dir):
             val = el.get(attr)
             if val and not val.startswith("data:"):
                 full_url = urllib.parse.urljoin(base_url, val)
-                local_path = download_asset(full_url, assets_dir)
+                local_path = download_asset(full_url, site_dir)
                 if local_path != full_url:
                     el[attr] = local_path
 
@@ -234,12 +233,9 @@ def cleanup_scripts(soup):
             parsed = urllib.parse.urlparse(src)
             if parsed.path and not parsed.hostname:
                 original_path = src.lstrip("/")
-                if not Path(SITE_DIR / "assets" / original_path).exists():
-                    if (ASSETS_DIR / original_path).exists():
-                        script["src"] = f"assets/{original_path}"
-                    else:
-                        print(f"  [x] Script introuvable, retiré : {src[:60]}")
-                        script.decompose()
+                if not (SITE_DIR / original_path).exists():
+                    print(f"  [x] Script introuvable, retiré : {src[:60]}")
+                    script.decompose()
 
     for iframe in soup.find_all("iframe"):
         src = iframe.get("src", "")
@@ -270,7 +266,7 @@ def main():
     print("  Scraper Site Affilié 1xPartners")
     print("=" * 60)
 
-    ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+    SITE_DIR.mkdir(parents=True, exist_ok=True)
 
     driver = setup_driver()
     try:
@@ -281,7 +277,7 @@ def main():
         soup = BeautifulSoup(html, "lxml")
 
         print("[*] Téléchargement des assets...")
-        download_assets(soup, base_url, ASSETS_DIR)
+        download_assets(soup, base_url, SITE_DIR)
 
         print("[*] Nettoyage des scripts externes problématiques...")
         cleanup_scripts(soup)
