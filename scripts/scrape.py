@@ -218,7 +218,7 @@ def cleanup_scripts(soup):
     blocked_domains = [
         "google-analytics", "googletagmanager",
         "facebook.net", "googleadservices", "doubleclick",
-        "gtag", "analytics", "tracking",
+        "gtag", "analytics", "tracking", "hotjar",
     ]
     for script in soup.find_all("script"):
         src = script.get("src", "")
